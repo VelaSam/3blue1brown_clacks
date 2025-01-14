@@ -12,7 +12,7 @@
 
 #define BIG_RECT_WIDTH 100
 #define BIG_RECT_HEIGHT 100
-#define BIG_RECT_MASS 1
+#define BIG_RECT_MASS 10
 #define BIG_RECT_INITIAL_VEL_SCALAR 1
 #define BIG_RECT_INITIAL_DIRECTION 1
 
@@ -21,6 +21,8 @@
 #define SMALL_RECT_MASS 1
 #define SMALL_RECT_INITIAL_VEL_SCALAR 0
 #define SMALL_RECT_INITIAL_DIRECTION 1
+
+int collision_counter = 0;
 
 typedef struct SIM_Rect {
   SDL_Rect shape; // x, y, w, h
@@ -35,6 +37,7 @@ void apply_bound_collisions(SIM_Rect *rect);
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b);
 float solve_for_va2(int ma, int mb, float va1, float vb1);
 float solve_for_vb2(int ma, int mb, float va1, float vb1);
+void print_square_info(SIM_Rect *rect);
 
 int main(int argc, char *argv[]) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -42,8 +45,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   SDL_Window *window =
-      SDL_CreateWindow("Bouncy Ball", SDL_WINDOWPOS_CENTERED,
-                       SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+      SDL_CreateWindow("Tacks", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                       SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   if (window == NULL) {
     printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
     return 1;
@@ -98,11 +101,12 @@ int main(int argc, char *argv[]) {
 }
 
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b) {
-  float a_initial_v = rect_a->direction * rect_a->velocity;
-  float b_initial_v = rect_b->direction * rect_b->velocity;
-
-  if (rect_a->shape.x + rect_a->width == rect_b->shape.x ||
-      rect_b->shape.x + rect_b->width == rect_a->shape.x) {
+  if (rect_a->shape.x + rect_a->width >= rect_b->shape.x &&
+          rect_a->shape.x + rect_a->width <= rect_b->shape.x + rect_b->width ||
+      rect_b->shape.x + rect_b->width >= rect_a->shape.x &&
+          rect_b->shape.x + rect_b->width <= rect_a->shape.x + rect_a->width) {
+    float a_initial_v = rect_a->direction * rect_a->velocity;
+    float b_initial_v = rect_b->direction * rect_b->velocity;
     float va_ans =
         solve_for_va2(rect_a->mass, rect_b->mass, a_initial_v, b_initial_v);
     if (va_ans < 0) {
@@ -122,15 +126,24 @@ void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b) {
       rect_b->direction = 1;
       rect_b->velocity = fabs(vb_ans);
     }
+    printf("collisions : %d\n", ++collision_counter);
   }
 }
 
 void apply_bound_collisions(SIM_Rect *rect) {
   if (rect->shape.x + rect->width >= SCREEN_WIDTH && rect->direction > 0) {
+    printf("first if \n");
+    print_square_info(rect);
     rect->direction = -1;
+    rect->shape.x = SCREEN_WIDTH - rect->width - 1;
+    print_square_info(rect);
   }
   if (rect->shape.x <= SCREEN_LEFT_BORDER && rect->direction < 0) {
+    printf("second if \n");
+    print_square_info(rect);
     rect->direction = 1;
+    rect->shape.x = SCREEN_LEFT_BORDER + 1;
+    print_square_info(rect);
   }
 }
 
@@ -141,4 +154,10 @@ float solve_for_va2(int ma, int mb, float va1, float vb1) {
 float solve_for_vb2(int ma, int mb, float va1, float vb1) {
   return ((float)(2 * ma) / (ma + mb)) * va1 +
          ((float)(mb - ma) / (ma + mb)) * vb1;
+}
+
+void print_square_info(SIM_Rect *rect) {
+  printf("x: %d, y: %d, w: %d, h: %d, m: %d, v: %f, d: %d\n", rect->shape.x,
+         rect->shape.y, rect->shape.w, rect->shape.h, rect->mass,
+         rect->velocity, rect->direction);
 }
