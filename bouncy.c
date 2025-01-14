@@ -5,21 +5,21 @@
 #include <stdlib.h>
 
 #define SCREEN_WIDTH 1200
-#define SCREEN_HEIGHT 800
+#define SCREEN_HEIGHT 300
 
 #define SCREEN_LEFT_BORDER 0
 #define SCREEN_TOP_BORDER 0
 
-#define BIG_RECT_WIDTH 200
-#define BIG_RECT_HEIGHT 200
-#define BIG_RECT_MASS 10
+#define BIG_RECT_WIDTH 100
+#define BIG_RECT_HEIGHT 100
+#define BIG_RECT_MASS 1
 #define BIG_RECT_INITIAL_VEL_SCALAR 1
 #define BIG_RECT_INITIAL_DIRECTION 1
 
 #define SMALL_RECT_WIDTH 100
 #define SMALL_RECT_HEIGHT 100
 #define SMALL_RECT_MASS 1
-#define SMALL_RECT_INITIAL_VEL_SCALAR 1
+#define SMALL_RECT_INITIAL_VEL_SCALAR 0
 #define SMALL_RECT_INITIAL_DIRECTION 1
 
 typedef struct SIM_Rect {
@@ -28,13 +28,13 @@ typedef struct SIM_Rect {
   int width;
   int height;
   int direction;
-  int velocity;
+  float velocity;
 } SIM_Rect;
 
 void apply_bound_collisions(SIM_Rect *rect);
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b);
-int solve_for_va2(int ma, int mb, int va1, int vb1);
-int solve_for_vb2(int ma, int mb, int va1, int vb1);
+float solve_for_va2(int ma, int mb, float va1, float vb1);
+float solve_for_vb2(int ma, int mb, float va1, float vb1);
 
 int main(int argc, char *argv[]) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -91,59 +91,36 @@ int main(int argc, char *argv[]) {
     SDL_FillRect(surface, &(small_rect.shape),
                  SDL_MapRGB(surface->format, 255, 0, 0));
     SDL_UpdateWindowSurface(window);
-    SDL_Delay(10);
+    SDL_Delay(5);
   }
 
   SDL_UpdateWindowSurface(window);
 }
 
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b) {
-  // rect a est a gauche
-  if (rect_a->shape.x + rect_a->width == rect_b->shape.x) {
-    int va_ans = solve_for_va2(rect_a->mass, rect_b->mass,
-                               rect_a->direction * rect_a->velocity,
-                               rect_b->direction * rect_b->velocity);
+  float a_initial_v = rect_a->direction * rect_a->velocity;
+  float b_initial_v = rect_b->direction * rect_b->velocity;
+
+  if (rect_a->shape.x + rect_a->width == rect_b->shape.x ||
+      rect_b->shape.x + rect_b->width == rect_a->shape.x) {
+    float va_ans =
+        solve_for_va2(rect_a->mass, rect_b->mass, a_initial_v, b_initial_v);
     if (va_ans < 0) {
       rect_a->direction = -1;
-      rect_a->velocity = abs(va_ans);
+      rect_a->velocity = fabs(va_ans);
     } else {
       rect_a->direction = 1;
-      rect_a->velocity = abs(va_ans);
+      rect_a->velocity = fabs(va_ans);
     }
 
-    // int vb_ans = solve_for_vb2(rect_a->mass, rect_b->mass,
-    //                            rect_a->direction * rect_a->velocity,
-    //                            rect_b->direction * rect_b->velocity);
-    // if (vb_ans < 0) {
-    //   rect_b->direction = -1;
-    //   rect_b->velocity = abs(vb_ans);
-    // } else {
-    //   rect_b->direction = 1;
-    //   rect_b->velocity = abs(vb_ans);
-    // }
-  }
-  // rect b est a gauche
-  else if (rect_b->shape.x + rect_b->width == rect_a->shape.x) {
-    // int va_ans = solve_for_va2(rect_a->mass, rect_b->mass,
-    //                            rect_a->direction * rect_a->velocity,
-    //                            rect_b->direction * rect_b->velocity);
-    // if (va_ans < 0) {
-    //   rect_a->direction = -1;
-    //   rect_a->velocity = abs(va_ans);
-    // } else {
-    //   rect_a->direction = 1;
-    //   rect_a->velocity = abs(va_ans);
-    // }
-
-    int vb_ans = solve_for_vb2(rect_a->mass, rect_b->mass,
-                               rect_a->direction * rect_a->velocity,
-                               rect_b->direction * rect_b->velocity);
+    float vb_ans =
+        solve_for_vb2(rect_a->mass, rect_b->mass, a_initial_v, b_initial_v);
     if (vb_ans < 0) {
       rect_b->direction = -1;
-      rect_b->velocity = abs(vb_ans);
+      rect_b->velocity = fabs(vb_ans);
     } else {
       rect_b->direction = 1;
-      rect_b->velocity = abs(vb_ans);
+      rect_b->velocity = fabs(vb_ans);
     }
   }
 }
@@ -157,10 +134,11 @@ void apply_bound_collisions(SIM_Rect *rect) {
   }
 }
 
-int solve_for_va2(int ma, int mb, int va1, int vb1) {
+float solve_for_va2(int ma, int mb, float va1, float vb1) {
   return ((float)(ma - mb) / (ma + mb)) * va1 +
          ((float)2 * mb / (ma + mb)) * vb1;
 }
-int solve_for_vb2(int ma, int mb, int va1, int vb1) {
-  return ((2 * ma) / (ma + mb)) * va1 + ((mb - ma) / (ma + mb)) * vb1;
+float solve_for_vb2(int ma, int mb, float va1, float vb1) {
+  return ((float)(2 * ma) / (ma + mb)) * va1 +
+         ((float)(mb - ma) / (ma + mb)) * vb1;
 }
