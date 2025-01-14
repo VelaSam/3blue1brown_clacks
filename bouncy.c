@@ -2,20 +2,25 @@
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_video.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#define SCREEN_WIDTH 900
-#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 1200
+#define SCREEN_HEIGHT 800
 
 #define SCREEN_LEFT_BORDER 0
 #define SCREEN_TOP_BORDER 0
 
-#define BIG_RECT_WIDTH 300
-#define BIG_RECT_HEIGHT 300
-#define BIG_RECT_MASS 100
+#define BIG_RECT_WIDTH 200
+#define BIG_RECT_HEIGHT 200
+#define BIG_RECT_MASS 10
+#define BIG_RECT_INITIAL_VEL_SCALAR 1
+#define BIG_RECT_INITIAL_DIRECTION 1
 
 #define SMALL_RECT_WIDTH 100
 #define SMALL_RECT_HEIGHT 100
-#define SMALL_RECT_MASS 10
+#define SMALL_RECT_MASS 1
+#define SMALL_RECT_INITIAL_VEL_SCALAR 1
+#define SMALL_RECT_INITIAL_DIRECTION 1
 
 typedef struct SIM_Rect {
   SDL_Rect shape; // x, y, w, h
@@ -28,6 +33,8 @@ typedef struct SIM_Rect {
 
 void apply_bound_collisions(SIM_Rect *rect);
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b);
+int solve_for_va2(int ma, int mb, int va1, int vb1);
+int solve_for_vb2(int ma, int mb, int va1, int vb1);
 
 int main(int argc, char *argv[]) {
   if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -44,13 +51,13 @@ int main(int argc, char *argv[]) {
   SDL_Surface *surface = SDL_GetWindowSurface(window);
 
   SIM_Rect big_rect;
-  big_rect.shape =
-      (SDL_Rect){BIG_RECT_WIDTH + 100, 0, BIG_RECT_WIDTH, BIG_RECT_HEIGHT};
+  big_rect.shape = (SDL_Rect){SCREEN_WIDTH - BIG_RECT_WIDTH, 0, BIG_RECT_WIDTH,
+                              BIG_RECT_HEIGHT};
   big_rect.width = BIG_RECT_WIDTH;
   big_rect.height = BIG_RECT_HEIGHT;
   big_rect.mass = BIG_RECT_MASS;
-  big_rect.direction = 1;
-  big_rect.velocity = 1;
+  big_rect.direction = BIG_RECT_INITIAL_DIRECTION;
+  big_rect.velocity = BIG_RECT_INITIAL_VEL_SCALAR;
 
   SIM_Rect small_rect;
   small_rect.shape = (SDL_Rect){SMALL_RECT_WIDTH + 100, 0, SMALL_RECT_WIDTH,
@@ -58,8 +65,8 @@ int main(int argc, char *argv[]) {
   small_rect.width = SMALL_RECT_WIDTH;
   small_rect.height = SMALL_RECT_HEIGHT;
   small_rect.mass = SMALL_RECT_MASS;
-  small_rect.direction = 1;
-  small_rect.velocity = 1;
+  small_rect.direction = SMALL_RECT_INITIAL_DIRECTION;
+  small_rect.velocity = SMALL_RECT_INITIAL_VEL_SCALAR;
 
   while (1) {
     SDL_Event event;
@@ -84,27 +91,76 @@ int main(int argc, char *argv[]) {
     SDL_FillRect(surface, &(small_rect.shape),
                  SDL_MapRGB(surface->format, 255, 0, 0));
     SDL_UpdateWindowSurface(window);
-    SDL_Delay(1);
+    SDL_Delay(10);
   }
 
   SDL_UpdateWindowSurface(window);
 }
 
 void apply_collisions(SIM_Rect *rect_a, SIM_Rect *rect_b) {
+  // rect a est a gauche
   if (rect_a->shape.x + rect_a->width == rect_b->shape.x) {
-    rect_a->velocity *= -1;
-    rect_b->velocity *= -1;
+    int va_ans = solve_for_va2(rect_a->mass, rect_b->mass,
+                               rect_a->direction * rect_a->velocity,
+                               rect_b->direction * rect_b->velocity);
+    if (va_ans < 0) {
+      rect_a->direction = -1;
+      rect_a->velocity = abs(va_ans);
+    } else {
+      rect_a->direction = 1;
+      rect_a->velocity = abs(va_ans);
+    }
+
+    // int vb_ans = solve_for_vb2(rect_a->mass, rect_b->mass,
+    //                            rect_a->direction * rect_a->velocity,
+    //                            rect_b->direction * rect_b->velocity);
+    // if (vb_ans < 0) {
+    //   rect_b->direction = -1;
+    //   rect_b->velocity = abs(vb_ans);
+    // } else {
+    //   rect_b->direction = 1;
+    //   rect_b->velocity = abs(vb_ans);
+    // }
   }
-  if (rect_b->shape.x + rect_b->width == rect_a->shape.x) {
-    rect_a->velocity *= -1;
-    rect_b->velocity *= -1;
+  // rect b est a gauche
+  else if (rect_b->shape.x + rect_b->width == rect_a->shape.x) {
+    // int va_ans = solve_for_va2(rect_a->mass, rect_b->mass,
+    //                            rect_a->direction * rect_a->velocity,
+    //                            rect_b->direction * rect_b->velocity);
+    // if (va_ans < 0) {
+    //   rect_a->direction = -1;
+    //   rect_a->velocity = abs(va_ans);
+    // } else {
+    //   rect_a->direction = 1;
+    //   rect_a->velocity = abs(va_ans);
+    // }
+
+    int vb_ans = solve_for_vb2(rect_a->mass, rect_b->mass,
+                               rect_a->direction * rect_a->velocity,
+                               rect_b->direction * rect_b->velocity);
+    if (vb_ans < 0) {
+      rect_b->direction = -1;
+      rect_b->velocity = abs(vb_ans);
+    } else {
+      rect_b->direction = 1;
+      rect_b->velocity = abs(vb_ans);
+    }
   }
 }
 
 void apply_bound_collisions(SIM_Rect *rect) {
-  if (rect->shape.x + rect->width >= SCREEN_WIDTH && rect->velocity > 0) {
-    rect->velocity = -1;
-  } else if (rect->shape.x <= SCREEN_LEFT_BORDER && rect->velocity < 0) {
-    rect->velocity = 1;
+  if (rect->shape.x + rect->width >= SCREEN_WIDTH && rect->direction > 0) {
+    rect->direction = -1;
   }
+  if (rect->shape.x <= SCREEN_LEFT_BORDER && rect->direction < 0) {
+    rect->direction = 1;
+  }
+}
+
+int solve_for_va2(int ma, int mb, int va1, int vb1) {
+  return ((float)(ma - mb) / (ma + mb)) * va1 +
+         ((float)2 * mb / (ma + mb)) * vb1;
+}
+int solve_for_vb2(int ma, int mb, int va1, int vb1) {
+  return ((2 * ma) / (ma + mb)) * va1 + ((mb - ma) / (ma + mb)) * vb1;
 }
